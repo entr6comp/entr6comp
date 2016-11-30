@@ -1,5 +1,6 @@
 ﻿using Antlr4.Runtime;
 using System;
+using System.Collections.Generic;
 using System.IO;
 
 namespace Compilador
@@ -23,22 +24,32 @@ namespace Compilador
                 parser = new MMMLParser(tokens);
 
                 var res = parser.funcbody();
+
                 string msgRetorno = string.Empty;
 
                 if (parser.qtdErro > 0)
                     msgRetorno = "Expressão inválida";
-                //else
-                //msgRetorno = string.Format("Tipo: {0}", res.oType != null ? res.oType.Name : "Não encontrado");
+                else
+                {
+                    Stack<object> pilhaSimbolo = parser.PilhaSimbolo;
+                    if (pilhaSimbolo != null && pilhaSimbolo.Count >= 1)
+                    {
+                        object resultado = pilhaSimbolo.Pop();
+                        msgRetorno = string.Format("Resultado final: {0} (type {1})", resultado, res.oType.Name);
+                    }
+                }
 
                 if (!string.IsNullOrEmpty(msgRetorno))
+                {
                     Console.WriteLine(msgRetorno);
+                    Console.WriteLine("-------------------------------");
+                }
 
                 file.Close();
             }
             catch (Exception ex)
             {
                 Console.WriteLine("Erro: " + ex);
-                //Environment.Exit(1);
                 return;
             }
         }

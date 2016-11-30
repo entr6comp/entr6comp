@@ -10,9 +10,7 @@ namespace Compilador
         static void Main(string[] args)
         {
             Thread.CurrentThread.CurrentCulture = CultureInfo.InvariantCulture;
-
             Expressao ex = new Expressao();
-            //NestedTest teste = new NestedTest();
         }
     }
 }

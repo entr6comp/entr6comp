@@ -3,11 +3,13 @@ grammar MMML;
 @header { 
 using System;
 using System.Linq;
+using System.Collections;
 }
 
 @parser::members {
    public int qtdErro = 0 ;
-   public NestedSymbolTable<Type> TabelaSimbolo = new NestedSymbolTable<Type>();
+   public Stack<object> PilhaSimbolo = new Stack<object>();
+   public NestedSymbolTable<EntradaSimbolo> TabelaSimbolo = new NestedSymbolTable<EntradaSimbolo>();
 
 	private void ImprimirTabelaSimbolo()
 	{
@@ -18,6 +20,65 @@ using System.Linq;
 				Console.WriteLine("{0}", entry);
 			}
 		}
+	}
+
+	private void CalcularValor(string operador)
+	{
+		if (PilhaSimbolo.Count >= 2)
+		{
+			int valor1 = Convert.ToInt32((PilhaSimbolo.Pop()));
+			int valor2 = Convert.ToInt32((PilhaSimbolo.Pop()));
+			
+			switch(operador)
+			{
+				case "+":
+						PilhaSimbolo.Push(valor2 + valor1);
+						break;
+				case "-":
+						PilhaSimbolo.Push(valor2 - valor1);
+						break;
+				case "*":
+						PilhaSimbolo.Push(valor2 * valor1);
+						break;
+				case "/":
+						if (valor1 > 0)
+							PilhaSimbolo.Push(valor2 / valor1);
+						else
+							qtdErro++;
+						break;
+				case "^":
+						PilhaSimbolo.Push((int)Math.Pow(Convert.ToDouble(valor2), Convert.ToDouble(valor1)));
+						break;
+			}
+		}
+		else
+		{
+			qtdErro++;
+		}
+	}
+
+	private void ConcatenarValor()
+	{
+		if (PilhaSimbolo.Count >= 2)
+		{
+			string valor1 = PilhaSimbolo.Pop().ToString().Replace("\"", "");
+			string valor2 = PilhaSimbolo.Pop().ToString().Replace("\"", "");
+			PilhaSimbolo.Push(string.Concat(valor2, valor1));
+		}
+		else
+		{
+			qtdErro++;
+		}		
+	}
+
+	private object BuscarValorTopo()
+	{
+		object valorTopo = null;
+
+		if (PilhaSimbolo.Count >= 1)
+			valorTopo = PilhaSimbolo.Pop();
+
+		return valorTopo;
 	}
 }
 
@@ -142,7 +203,7 @@ returns [Type oType]
 	:
         ifexpr                                       #fbody_if_rule
     |   letexpr       { $oType = $letexpr.oType; }   #fbody_let_rule
-    |   metaexpr      { $oType = $metaexpr.oType; ImprimirTabelaSimbolo(); Console.WriteLine("---------------------"); }   #fbody_expr_rule
+    |   metaexpr      { $oType = $metaexpr.oType; ImprimirTabelaSimbolo(); Console.WriteLine("-------------------------------"); }   #fbody_expr_rule
     ;
 
 ifexpr
@@ -150,31 +211,38 @@ ifexpr
     ;
 
 letexpr
-returns [NestedSymbolTable<Type> oTabelaSimboloLocal, Type oType]
-    : 'let' letlist 'in' { TabelaSimbolo = $letlist.oTabelaSimboloLocal; } funcbody { TabelaSimbolo = TabelaSimbolo.Parent; $oType = $funcbody.oType; } #letexpression_rule
+returns [NestedSymbolTable<EntradaSimbolo> oTabelaSimboloLocal, Type oType]
+    : 'let' letlist 'in' { TabelaSimbolo = $letlist.oTabelaSimboloLocal; } funcbody { TabelaSimbolo = TabelaSimbolo.Parent; 
+																					  $oType = $funcbody.oType; } #letexpression_rule
     ;
 
 letlist
-returns [NestedSymbolTable<Type> oTabelaSimboloLocal]
+returns [NestedSymbolTable<EntradaSimbolo> oTabelaSimboloLocal]
 	@init 
 	{
-		$oTabelaSimboloLocal = new NestedSymbolTable<Type>(TabelaSimbolo);
+		$oTabelaSimboloLocal = new NestedSymbolTable<EntradaSimbolo>(TabelaSimbolo);
 		TabelaSimbolo = $oTabelaSimboloLocal;
 	}
-    : letvarexpr[$oTabelaSimboloLocal] { $oTabelaSimboloLocal.Store($letvarexpr.oTexto, $letvarexpr.oType); } letlist_cont[$oTabelaSimboloLocal] #letlist_rule
+    : letvarexpr[$oTabelaSimboloLocal] { $oTabelaSimboloLocal.Store($letvarexpr.oTexto, 
+																	new EntradaSimbolo() { Tipo = $letvarexpr.oType, 
+																						   Valor = BuscarValorTopo() }); } 
+	  letlist_cont[$oTabelaSimboloLocal] #letlist_rule
     ;
 
-	letlist_cont [NestedSymbolTable<Type> oTabelaSimboloLocal]
-    : ',' letvarexpr[$oTabelaSimboloLocal] { $oTabelaSimboloLocal.Store($letvarexpr.oTexto, $letvarexpr.oType); } letlist_cont[$oTabelaSimboloLocal]
+	letlist_cont [NestedSymbolTable<EntradaSimbolo> oTabelaSimboloLocal]
+    : ',' letvarexpr[$oTabelaSimboloLocal] { $oTabelaSimboloLocal.Store($letvarexpr.oTexto, 
+																		new EntradaSimbolo() { Tipo = $letvarexpr.oType, 
+																							   Valor = BuscarValorTopo() }); } 
+	      letlist_cont[$oTabelaSimboloLocal]
                                                   #letlist_cont_rule
     |											  #letlist_cont_end                                           
     ;
 
-letvarexpr[NestedSymbolTable<Type> oTabelaSimboloLocal]
+letvarexpr[NestedSymbolTable<EntradaSimbolo> oTabelaSimboloLocal]
 returns [string oTexto, Type oType]
     :    symbol { $oTexto = $symbol.text; } '=' funcbody { $oType = $funcbody.oType; }              #letvarattr_rule
-    |    '_'    '='  funcbody { $oTexto = "_"; $oType = $funcbody.oType; }                          #letvarresult_ignore_rule
-    |    l=symbol '::' r=symbol { $oTexto = $l.text + $r.text; } '=' funcbody { $oType = $funcbody.oType; } #letunpack_rule
+    |    '_'    '='  funcbody #letvarresult_ignore_rule
+	|    l=symbol '::' r=symbol '=' funcbody #letunpack_rule
     ;
 
 metaexpr
@@ -189,14 +257,17 @@ returns [Type oType]
 		if ($l.oType == typeof(int) && $r.oType == typeof(int))
 		{
 		   $oType = typeof(int);
+		   CalcularValor("^");
 		}
 		else if ($l.oType == typeof(float) && $r.oType == typeof(float))
 		{
 		   $oType = typeof(float);
+		   CalcularValor("^");
 		}
 		else if (($l.oType == typeof(int) && $r.oType == typeof(float)) || ($r.oType == typeof(int) && $l.oType == typeof(float)))
 		{
 			$oType = typeof(float);
+			CalcularValor("^");
 		}
 		else
 		{
@@ -208,6 +279,7 @@ returns [Type oType]
 		if($l.oType == typeof(string) && $r.oType == typeof(string))
 		{
  			$oType = typeof(string);
+			ConcatenarValor();
  		}
 		else
 		{
@@ -219,14 +291,17 @@ returns [Type oType]
 		if ($l.oType == typeof(int) && $r.oType == typeof(int))
 		{
 		   $oType = typeof(int);
+		   CalcularValor($TOK_DIV_OR_MUL.text);
 		}
 		else if ($l.oType == typeof(float) && $r.oType == typeof(float))
 		{
 		   $oType = typeof(float);
+		   CalcularValor($TOK_DIV_OR_MUL.text);
 		}
 		else if (($l.oType == typeof(int) && $r.oType == typeof(float)) || ($r.oType == typeof(int) && $l.oType == typeof(float)))
 		{
 			$oType = typeof(float);
+			CalcularValor($TOK_DIV_OR_MUL.text);
 		}
 		else
 		{
@@ -238,14 +313,17 @@ returns [Type oType]
 		if ($l.oType == typeof(int) && $r.oType == typeof(int))
 		{
 		   $oType = typeof(int);
+		   CalcularValor($TOK_PLUS_OR_MINUS.text);
 		}
 		else if ($l.oType == typeof(float) && $r.oType == typeof(float))
 		{
 		   $oType = typeof(float);
+		   CalcularValor($TOK_PLUS_OR_MINUS.text);
 		}
 		else if (($l.oType == typeof(int) && $r.oType == typeof(float)) || ($r.oType == typeof(int) && $l.oType == typeof(float)))
 		{
 			$oType = typeof(float);
+			CalcularValor($TOK_PLUS_OR_MINUS.text);
 		}
 		else
 		{
@@ -267,16 +345,19 @@ returns [Type oType]
     | metaexpr TOK_BOOL_AND_OR metaexpr              { $oType = typeof(bool); }   #me_boolandor_rule   // &&   and  ||  are equal
     | symbol
 	{
-		if (TabelaSimbolo.Lookup($symbol.text) != null)
+		SymbolEntry<EntradaSimbolo> symbolEntry = TabelaSimbolo.Lookup($symbol.text);
+		if (symbolEntry != null)
 		{
-			$oType = TabelaSimbolo.Lookup($symbol.text).Symbol;
+			if (symbolEntry.Symbol.Valor != null)
+				PilhaSimbolo.Push(symbolEntry.Symbol.Valor);
+			$oType = symbolEntry.Symbol.Tipo;
 		}
 		else
 		{
 			qtdErro++;
 		}
 	} #me_exprsymbol_rule  // a single symbol
-    | literal 										 { $oType = $literal.oType; } #me_exprliteral_rule // literal value
+    | literal 										 { PilhaSimbolo.Push($literal.oValor); $oType = $literal.oType; } #me_exprliteral_rule // literal value
     | funcall                                                                     #me_exprfuncall_rule // a funcion call
     | cast											 { $oType = $cast.oType; }    #me_exprcast_rule    // cast a type to other
     ;
@@ -307,13 +388,13 @@ funcall_params_cont
     ;
 
 literal
-returns [Type oType]
+returns [object oValor, Type oType]
 :
-        'nil'                                 #literalnil_rule
-    |   'true'                                #literaltrue_rule
-    |   number { $oType = $number.oType; }   #literalnumber_rule
-    |   strlit { $oType = typeof(string); }  #literalstring_rule
-    |   charlit { $oType = typeof(char); } #literal_char_rule
+        'nil'                               #literalnil_rule
+    |   'true' { $oType = typeof(bool); }   #literaltrue_rule
+    |   number { $oValor = $number.text; $oType = $number.oType; }  #literalnumber_rule
+    |   strlit { $oValor = $strlit.text; $oType = typeof(string); } #literalstring_rule
+    |   charlit { $oValor = $charlit.text; $oType = typeof(char); } #literal_char_rule
     ;
 
 strlit: TOK_STR_LIT
@@ -326,10 +407,10 @@ charlit
  number
  returns [Type oType]
  :
-        FLOAT     { $oType = typeof(float); }                  #numberfloat_rule
-    |   DECIMAL   { $oType = typeof(int); }                #numberdecimal_rule
-    |   HEXADECIMAL { $oType = typeof(int); }          #numberhexadecimal_rule
-    |   BINARY { $oType = typeof(int); }                    #numberbinary_rule
+        FLOAT { $oType = typeof(float); }     #numberfloat_rule
+    |   DECIMAL { $oType = typeof(int); }     #numberdecimal_rule
+    |   HEXADECIMAL { $oType = typeof(int); } #numberhexadecimal_rule
+    |   BINARY { $oType = typeof(int); }      #numberbinary_rule
     ;
 
 symbol

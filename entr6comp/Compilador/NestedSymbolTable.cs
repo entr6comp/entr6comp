@@ -11,10 +11,10 @@ namespace Compilador
     {
         #region Propriedades
 
+        public string Name;
         public T Symbol;
         public int Offset;
         public int Size;
-        public string Name;
 
         #endregion Propriedades
 
@@ -34,7 +34,26 @@ namespace Compilador
 
         override public string ToString()
         {
-            return string.Format("{0} pos {1} type {2}", Name, Offset, Symbol != null ? Symbol.ToString().Replace("System.", "") : "");
+            string retorno;
+            object typeSymbol = Symbol;
+            object valorSymbol;
+
+            if (typeSymbol is EntradaSimbolo)
+            {
+                EntradaSimbolo entradaSimbolo = (EntradaSimbolo)Convert.ChangeType(Symbol, typeof(EntradaSimbolo));
+                typeSymbol = entradaSimbolo.Tipo;
+                valorSymbol = entradaSimbolo.Valor;
+                retorno = string.Format("{0} = {1} pos {2} type {3}", Name,
+                                                                      valorSymbol,
+                                                                      Offset,
+                                                                      typeSymbol != null ? typeSymbol.ToString().Replace("System.", "") : "");
+            }
+            else
+                retorno = string.Format("{0} pos {1} type {2}", Name, 
+                                                                Offset, 
+                                                                typeSymbol != null ? typeSymbol.ToString().Replace("System.", "") : "");
+
+            return retorno;
         }
 
         #endregion Métodos Públicos
@@ -249,32 +268,9 @@ namespace Compilador
         #endregion Métodos Públicos
     }
 
-    public class NestedTest
+    public struct EntradaSimbolo
     {
-        public NestedTest()
-        {
-            var mt = new NestedSymbolTable<int>();
-            mt.Store("lala", 0);
-            mt.Store("lele", 1);
-            var nt1 = new NestedSymbolTable<int>(mt);
-            nt1.Store("lala", 10);
-            var nt2 = new NestedSymbolTable<int>(mt);
-            nt2.Store("lala", 11);
-
-            foreach (var entry in nt2)
-            {
-                Console.WriteLine("nt2 Entry: {0}", entry);
-            }
-
-            foreach (var entry in nt1)
-            {
-                Console.WriteLine("nt1 Entry: {0}", entry);
-            }
-
-            foreach (var entry in mt)
-            {
-                Console.WriteLine("mt Entry: {0}", entry);
-            }
-        }
+        public Type Tipo;
+        public object Valor;
     }
 }

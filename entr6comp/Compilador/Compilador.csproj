@@ -53,10 +53,6 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
-    <Antlr4 Include="Numbers.g4">
-      <Generator>MSBuild:Compile</Generator>
-      <CustomToolNamespace>Compilador</CustomToolNamespace>
-    </Antlr4>
     <Antlr4 Include="MMML.g4">
       <Generator>MSBuild:Compile</Generator>
       <CustomToolNamespace>Compilador</CustomToolNamespace>
